@@ -85,6 +85,8 @@ For Corporate Card Expenses imports, there are two separate mappings:
 - Cardholder/card identity: the parser groups T5 transactions by VCF account number and calls `createAccountData()` with `accountId`, `cardHolder`, and `employeeId` when T3/T4 data is present. NetSuite uses the employee ID or cardholder name to link imported corporate card expenses to employees.
 - Expense GL account: the parser emits an `expenseCode` such as `VCF_OFFICE`, `VCF_LODGING`, or `VCF_MEALS`. In NetSuite, map those codes on the format profile's Expense Code Mapping subtab to Expense Categories. Each Expense Category is linked to the GL expense account that will be debited.
 
+`createAccountData()` does not create a persistent NetSuite GL account, employee record, or cardholder record. It creates an account data set for the current parser run, which is the container NetSuite expects before calling `createNewTransaction()`. Calling it once per VCF card account in each import is normal parser behavior.
+
 The credit side is controlled by NetSuite's Corporate Card Expenses setup. NetSuite credits the selected corporate credit card account, which can come from Accounting Preferences, the employee record, or the expense report depending on your account configuration.
 
 For a common per-employee card setup, create each card as a NetSuite credit card GL account and attach that account to the employee using NetSuite's native Default Account for Corporate Card Expenses field. The parser supplies the employee/cardholder identity; NetSuite uses the employee-level corporate card account for the credit side.
