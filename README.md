@@ -1,3 +1,5 @@
+![VCF 4.0 NetSuite FI Parser overview](assets/readme.png)
+
 # VCF 4.0 NetSuite FI Parser
 
 An unofficial NetSuite Financial Institution Parser plug-in for Visa Commercial Format (VCF) 4.0 corporate card files.
