@@ -5,6 +5,7 @@ const vm = require('vm');
 
 const repoRoot = path.resolve(__dirname, '..');
 const parserPath = path.join(repoRoot, 'FileCabinet', 'SuiteScripts', 'vcf40_fi_parser.js');
+const usingDefaultFixture = !process.argv[2];
 const samplePath = process.argv[2] || path.join(repoRoot, 'test', 'fixtures', 'minimal_vcf40_sample.tsv');
 
 function loadSuiteScript(filePath) {
@@ -22,22 +23,42 @@ function loadSuiteScript(filePath) {
   return exported;
 }
 
-function createMockContext(contents) {
+function createMockContext(contents, options = {}) {
   const accounts = [];
   const errors = [];
   const expenseCodes = [];
   const transactionCodes = [];
+  const inputData = options.iteratorOnly ? {
+    lines: {
+      iterator() {
+        const lines = String(contents || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
+        let index = 0;
+        return {
+          each(callback) {
+            while (index < lines.length) {
+              const keepGoing = callback({ value: lines[index] });
+              index += 1;
+              if (keepGoing === false) {
+                return false;
+              }
+            }
+            return true;
+          }
+        };
+      }
+    }
+  } : {
+    getContents() {
+      return contents;
+    }
+  };
 
   return {
     accounts,
     errors,
     expenseCodes,
     transactionCodes,
-    inputData: {
-      getContents() {
-        return contents;
-      }
-    },
+    inputData,
     createAccountData(options) {
       assert(options.cardHolder || options.employeeId, 'Corporate card account data should include a cardholder or employee ID.');
 
@@ -92,23 +113,43 @@ assert.strictEqual(context.errors.length, 0, 'Parser emitted unexpected errors.'
 assert.strictEqual(context.expenseCodes.length, 11, 'Expected built-in expense code buckets.');
 assert(context.expenseCodes.some((expenseCode) => expenseCode.code === 'VCF_OFFICE'), 'Expected VCF_OFFICE expense code.');
 assert.strictEqual(context.transactionCodes.length, 2, 'Expected charge and credit transaction codes.');
-assert.strictEqual(context.accounts.length, 1, 'Expected one card account.');
-assert.strictEqual(account.options.cardHolder, 'AVERY PARK');
-assert.strictEqual(account.options.employeeId, 'E1001');
-assert.strictEqual(transactions.length, 2, 'Expected two T5 card transactions.');
-assert.strictEqual(new Set(transactions.map((transaction) => transaction.uniqueId)).size, 2, 'Expected unique IDs.');
-assert.strictEqual(centsTotal(transactions), 10000, 'Expected signed transaction total of $100.00.');
-assert.strictEqual(transactions[0].expenseCode, 'VCF_OFFICE');
-assert.strictEqual(transactions[0].currency, 'CAD');
-assert.strictEqual(transactions[0].additionalFields.billedCurrencyISOCode, 'CAD');
-assert.strictEqual(transactions[1].amount, -23.45);
-assert.strictEqual(transactions[1].transactionTypeCode, 'CREDIT');
+assert(context.accounts.length > 0, 'Expected at least one card account.');
+assert(transactions.length > 0, 'Expected at least one T5 card transaction.');
+assert.strictEqual(
+  new Set(transactions.map((transaction) => transaction.uniqueId)).size,
+  transactions.length,
+  'Expected unique transaction IDs.'
+);
+
+if (usingDefaultFixture) {
+  const iteratorContext = createMockContext(sample, { iteratorOnly: true });
+  parser.parseData(iteratorContext);
+
+  assert.strictEqual(iteratorContext.accounts.length, 1, 'Expected iterator input to parse one card account.');
+  assert.strictEqual(
+    iteratorContext.accounts.flatMap((parsedAccount) => parsedAccount.transactions).length,
+    2,
+    'Expected iterator input to parse two card transactions.'
+  );
+
+  assert.strictEqual(context.accounts.length, 1, 'Expected one card account.');
+  assert.strictEqual(account.options.cardHolder, 'AVERY PARK');
+  assert.strictEqual(account.options.employeeId, 'E1001');
+  assert.strictEqual(transactions.length, 2, 'Expected two T5 card transactions.');
+  assert.strictEqual(centsTotal(transactions), 10000, 'Expected signed transaction total of $100.00.');
+  assert.strictEqual(transactions[0].expenseCode, 'VCF_OFFICE');
+  assert.strictEqual(transactions[0].currency, 'CAD');
+  assert.strictEqual(transactions[0].additionalFields.billedCurrencyISOCode, 'CAD');
+  assert.strictEqual(transactions[1].amount, -23.45);
+  assert.strictEqual(transactions[1].transactionTypeCode, 'CREDIT');
+}
 
 console.log(JSON.stringify({
   sample: samplePath,
   accounts: context.accounts.length,
   transactions: transactions.length,
   signedTotal: (centsTotal(transactions) / 100).toFixed(2),
-  account: account.options,
-  firstTransaction: transactions[0]
+  accountsWithoutEmployeeId: context.accounts.filter((parsedAccount) => !parsedAccount.options.employeeId).length,
+  firstAccount: usingDefaultFixture ? account.options : undefined,
+  firstTransaction: usingDefaultFixture ? transactions[0] : undefined
 }, null, 2));

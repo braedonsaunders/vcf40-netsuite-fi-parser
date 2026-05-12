@@ -91,10 +91,29 @@ define([], function () {
     }
 
     function getInputContents(context) {
-        if (!context || !context.inputData || typeof context.inputData.getContents !== 'function') {
-            throw new Error('Missing NetSuite inputData contents.');
+        var inputData;
+        var lines;
+
+        if (!context || !context.inputData) {
+            throw new Error('Missing NetSuite inputData.');
         }
-        return context.inputData.getContents();
+
+        inputData = context.inputData;
+
+        if (typeof inputData.getContents === 'function') {
+            return inputData.getContents();
+        }
+
+        if (inputData.lines && typeof inputData.lines.iterator === 'function') {
+            lines = [];
+            inputData.lines.iterator().each(function (line) {
+                lines.push(String(line.value || ''));
+                return true;
+            });
+            return lines.join('\n');
+        }
+
+        throw new Error('Missing NetSuite inputData contents.');
     }
 
     function createAccountData(context, accountNumber, account, cardholder) {
