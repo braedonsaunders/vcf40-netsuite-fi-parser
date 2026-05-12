@@ -1,0 +1,21 @@
+{
+  "name": "vcf40-netsuite-fi-parser",
+  "version": "0.1.0",
+  "description": "NetSuite Financial Institution Parser plug-in for Visa Commercial Format 4.0 corporate card files.",
+  "license": "MIT",
+  "author": "Braedon Saunders",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/braedonsaunders/vcf40-netsuite-fi-parser.git"
+  },
+  "bugs": {
+    "url": "https://github.com/braedonsaunders/vcf40-netsuite-fi-parser/issues"
+  },
+  "homepage": "https://github.com/braedonsaunders/vcf40-netsuite-fi-parser#readme",
+  "scripts": {
+    "test": "node test/vcf40_fi_parser.test.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
