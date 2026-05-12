@@ -76,6 +76,19 @@ The current parser uses these VCF records:
 
 Other enhanced VCF records, such as lodging, fleet, passenger itinerary, and line-item details, are currently ignored. They can be added later by extending `parseVcf()` and `toNetSuiteTransaction()`.
 
+## GL Account Mapping
+
+The parser does not directly assign NetSuite GL accounts from the VCF card account number.
+
+For Corporate Card Expenses imports, there are two separate mappings:
+
+- Cardholder/card identity: the parser groups T5 transactions by VCF account number and calls `createAccountData()` with `accountId`, `cardHolder`, and `employeeId` when T3/T4 data is present. NetSuite uses the employee ID or cardholder name to link imported corporate card expenses to employees.
+- Expense GL account: the parser emits an `expenseCode` such as `VCF_OFFICE`, `VCF_LODGING`, or `VCF_MEALS`. In NetSuite, map those codes on the format profile's Expense Code Mapping subtab to Expense Categories. Each Expense Category is linked to the GL expense account that will be debited.
+
+The credit side is controlled by NetSuite's Corporate Card Expenses setup. NetSuite credits the selected corporate credit card account, which can come from Accounting Preferences, the employee record, or the expense report depending on your account configuration.
+
+If you need one GL credit card account per physical card, configure that in NetSuite's employee/corporate card account setup or add a NetSuite-side customization after import. The VCF `accountId` is kept as the raw external card/account identifier; it is not a NetSuite GL account internal ID.
+
 Oracle's docs confirm that corporate card imports use the Financial Institution Parser Plug-in interface and that `createNewTransaction()` must include `additionalFields.billedCurrencyISOCode` for corporate card data:
 
 - [Financial Institution Parser Plug-in overview](https://docs.oracle.com/en/cloud/saas/netsuite/ns-online-help/chapter_159077938079.html)
