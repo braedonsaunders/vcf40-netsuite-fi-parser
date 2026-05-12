@@ -87,7 +87,9 @@ For Corporate Card Expenses imports, there are two separate mappings:
 
 The credit side is controlled by NetSuite's Corporate Card Expenses setup. NetSuite credits the selected corporate credit card account, which can come from Accounting Preferences, the employee record, or the expense report depending on your account configuration.
 
-If you need one GL credit card account per physical card, configure that in NetSuite's employee/corporate card account setup or add a NetSuite-side customization after import. The VCF `accountId` is kept as the raw external card/account identifier; it is not a NetSuite GL account internal ID.
+For a common per-employee card setup, create each card as a NetSuite credit card GL account and attach that account to the employee using NetSuite's native Default Account for Corporate Card Expenses field. The parser supplies the employee/cardholder identity; NetSuite uses the employee-level corporate card account for the credit side.
+
+If you need one GL credit card account per physical card but do not store that mapping on the employee record, add a NetSuite-side customization after import. The VCF `accountId` is kept as the raw external card/account identifier; it is not a NetSuite GL account internal ID.
 
 Oracle's docs confirm that corporate card imports use the Financial Institution Parser Plug-in interface and that `createNewTransaction()` must include `additionalFields.billedCurrencyISOCode` for corporate card data:
 
