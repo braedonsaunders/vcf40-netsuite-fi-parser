@@ -45,6 +45,42 @@ define([], function () {
         { code: 'VCF_MISC', description: 'Miscellaneous' }
     ];
 
+    var STRUCTURE_RECORD_FIELD_COUNT = 16;
+    var RECORD_BOUNDARY_MARKERS = {
+        '3': true,
+        '4': true,
+        '6': true,
+        '7': true,
+        '8': true,
+        '9': true
+    };
+
+    var VCF_RECORD_FIELD_COUNTS = {
+        '1': 35,
+        '2': 37,
+        '3': 47,
+        '4': 35,
+        '5': 76,
+        '6': 21,
+        '7': 34,
+        '8': 32,
+        '9': 37,
+        '10': 33,
+        '11': 11,
+        '14': 36,
+        '15': 33,
+        '17': 53,
+        '18': 19,
+        '20': 33,
+        '21': 33,
+        '26': 33,
+        '27': 16,
+        '28': 23,
+        '29': 12,
+        '30': 12,
+        '31': 23
+    };
+
     function parseData(context) {
         var contents = getInputContents(context);
         var parsed = parseVcf(contents);
@@ -294,12 +330,94 @@ define([], function () {
         var lines = normalized.split('\n');
         var rows = [];
         var i;
+
+        if (lines.length === 1 && normalized.indexOf('\t') !== -1) {
+            return splitConcatenatedRows(normalized);
+        }
+
         for (i = 0; i < lines.length; i += 1) {
             if (lines[i] !== '') {
                 rows.push(lines[i].split('\t'));
             }
         }
         return rows;
+    }
+
+    function splitConcatenatedRows(contents) {
+        var tokens = String(contents || '').split('\t');
+        var rows = [];
+        var index = 0;
+        var pendingMarker = null;
+        var currentBlockType = '';
+
+        while (index < tokens.length || pendingMarker) {
+            var marker = clean(pendingMarker || tokens[index]);
+            var fieldCount;
+            var row;
+
+            if (!marker) {
+                break;
+            }
+
+            if (marker === '6' || marker === '7' || marker === '8' || marker === '9') {
+                row = takeConcatenatedRow(tokens, index, STRUCTURE_RECORD_FIELD_COUNT, pendingMarker);
+                index = row.nextIndex;
+                pendingMarker = row.pendingMarker;
+                rows.push(row.fields);
+
+                if (marker === '8') {
+                    currentBlockType = clean(row.fields[4]);
+                } else if (marker === '9') {
+                    currentBlockType = '';
+                }
+                continue;
+            }
+
+            fieldCount = VCF_RECORD_FIELD_COUNTS[currentBlockType];
+            if (!fieldCount) {
+                break;
+            }
+
+            row = takeConcatenatedRow(tokens, index, fieldCount, pendingMarker);
+            index = row.nextIndex;
+            pendingMarker = row.pendingMarker;
+            rows.push(row.fields);
+        }
+
+        return rows;
+    }
+
+    function takeConcatenatedRow(tokens, index, fieldCount, pendingMarker) {
+        var fields = [];
+        var lastField;
+        var marker;
+
+        if (pendingMarker) {
+            fields.push(pendingMarker);
+            pendingMarker = null;
+        }
+
+        while (fields.length < fieldCount && index < tokens.length) {
+            fields.push(tokens[index]);
+            index += 1;
+        }
+
+        if (fields.length < fieldCount) {
+            throw new Error('Incomplete VCF record while splitting concatenated file.');
+        }
+
+        lastField = fields[fields.length - 1] || '';
+        marker = lastField.charAt(lastField.length - 1);
+        if (RECORD_BOUNDARY_MARKERS[marker]) {
+            fields[fields.length - 1] = lastField.substr(0, lastField.length - 1);
+            pendingMarker = marker;
+        }
+
+        return {
+            fields: fields,
+            nextIndex: index,
+            pendingMarker: pendingMarker
+        };
     }
 
     function isBlankRow(row) {

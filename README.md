@@ -29,6 +29,7 @@ FileCabinet/SuiteScripts/vcf40_fi_parser.js
 ## What It Does
 
 - Parses VCF 4.0 tab-delimited transaction-set files.
+- Handles normal CRLF-delimited records and issuer files that concatenate VCF records without CR/LF delimiters.
 - Imports T5 Card Transaction records as NetSuite corporate card transactions.
 - Uses T3 Card Account and T4 Cardholder records for cardholder and employee matching.
 - Converts VCF `MMDDCCYY` dates to NetSuite ISO `YYYY-MM-DD`.

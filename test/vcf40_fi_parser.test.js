@@ -98,6 +98,48 @@ function centsTotal(transactions) {
   return transactions.reduce((total, transaction) => total + Math.round(Number(transaction.amount) * 100), 0);
 }
 
+function padRow(row, length) {
+  const padded = row.slice();
+  while (padded.length < length) {
+    padded.push('');
+  }
+  return padded;
+}
+
+function createConcatenatedFixture(contents) {
+  const fieldCounts = {
+    3: 47,
+    4: 35,
+    5: 76
+  };
+  let currentBlockType = '';
+
+  return String(contents || '')
+    .replace(/\r\n/g, '\n')
+    .replace(/\r/g, '\n')
+    .split('\n')
+    .filter(Boolean)
+    .map((line) => {
+      const row = line.split('\t');
+      const marker = row[0];
+      let padded;
+
+      if (marker === '6' || marker === '7' || marker === '8' || marker === '9') {
+        padded = padRow(row, 16);
+        if (marker === '8') {
+          currentBlockType = row[4];
+        } else if (marker === '9') {
+          currentBlockType = '';
+        }
+        return padded.join('\t');
+      }
+
+      padded = padRow(row, fieldCounts[currentBlockType] || row.length);
+      return padded.join('\t');
+    })
+    .join('');
+}
+
 const parser = loadSuiteScript(parserPath);
 const sample = fs.readFileSync(samplePath, 'utf8');
 const context = createMockContext(sample);
@@ -123,13 +165,22 @@ assert.strictEqual(
 
 if (usingDefaultFixture) {
   const iteratorContext = createMockContext(sample, { iteratorOnly: true });
+  const concatenatedContext = createMockContext(createConcatenatedFixture(sample));
+
   parser.parseData(iteratorContext);
+  parser.parseData(concatenatedContext);
 
   assert.strictEqual(iteratorContext.accounts.length, 1, 'Expected iterator input to parse one card account.');
   assert.strictEqual(
     iteratorContext.accounts.flatMap((parsedAccount) => parsedAccount.transactions).length,
     2,
     'Expected iterator input to parse two card transactions.'
+  );
+  assert.strictEqual(concatenatedContext.accounts.length, 1, 'Expected concatenated input to parse one card account.');
+  assert.strictEqual(
+    concatenatedContext.accounts.flatMap((parsedAccount) => parsedAccount.transactions).length,
+    2,
+    'Expected concatenated input to parse two card transactions.'
   );
 
   assert.strictEqual(context.accounts.length, 1, 'Expected one card account.');
