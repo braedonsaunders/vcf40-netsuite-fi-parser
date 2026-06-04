@@ -60,7 +60,7 @@ function createMockContext(contents, options = {}) {
     transactionCodes,
     inputData,
     createAccountData(options) {
-      assert(options.cardHolder || options.employeeId, 'Corporate card account data should include a cardholder or employee ID.');
+      assert(options.accountId, 'Bank reconciliation account data should include the external accountId.');
 
       const account = {
         options,
@@ -69,8 +69,8 @@ function createMockContext(contents, options = {}) {
           assert(transaction.date, 'Transaction date is required.');
           assert.strictEqual(typeof transaction.amount, 'number', 'Transaction amount must be numeric.');
           assert(transaction.uniqueId, 'Transaction uniqueId is required for duplicate detection.');
-          assert(transaction.expenseCode, 'Corporate card expenseCode is required.');
-          assert(transaction.additionalFields.billedCurrencyISOCode, 'Corporate card billedCurrencyISOCode is required.');
+          assert(transaction.transactionTypeCode, 'Bank reconciliation transactionTypeCode is required.');
+          assert(transaction.additionalFields.billedCurrencyISOCode, 'billedCurrencyISOCode should be available for card currency metadata.');
           this.transactions.push(transaction);
         }
       };
