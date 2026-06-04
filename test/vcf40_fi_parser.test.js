@@ -11,10 +11,25 @@ const samplePath = process.argv[2] || path.join(repoRoot, 'test', 'fixtures', 'm
 function loadSuiteScript(filePath) {
   const code = fs.readFileSync(filePath, 'utf8');
   let exported;
+  const moduleMocks = {
+    'N/log': {
+      audit() {},
+      debug() {},
+      error() {}
+    },
+    'N/error': {
+      create(options) {
+        const error = new Error(options.message || options.description || options.name);
+        error.name = options.name;
+        error.options = options;
+        return error;
+      }
+    }
+  };
   const sandbox = {
     console,
     define(dependencies, factory) {
-      exported = factory();
+      exported = factory(...dependencies.map((dependency) => moduleMocks[dependency]));
     }
   };
 
@@ -71,6 +86,7 @@ function createMockContext(contents, options = {}) {
           assert(transaction.uniqueId, 'Transaction uniqueId is required for duplicate detection.');
           assert(transaction.transactionTypeCode, 'Bank reconciliation transactionTypeCode is required.');
           assert(transaction.additionalFields.billedCurrencyISOCode, 'billedCurrencyISOCode should be available for card currency metadata.');
+          assert(!transaction.expenseCode, 'Bank reconciliation transactions should not require expenseCode by default.');
           this.transactions.push(transaction);
         }
       };
@@ -188,7 +204,7 @@ if (usingDefaultFixture) {
   assert.strictEqual(account.options.employeeId, 'E1001');
   assert.strictEqual(transactions.length, 2, 'Expected two T5 card transactions.');
   assert.strictEqual(centsTotal(transactions), 10000, 'Expected signed transaction total of $100.00.');
-  assert.strictEqual(transactions[0].expenseCode, 'VCF_OFFICE');
+  assert.strictEqual(transactions[0].additionalFields.vcfExpenseBucket, 'VCF_OFFICE');
   assert.strictEqual(transactions[0].currency, 'CAD');
   assert.strictEqual(transactions[0].additionalFields.billedCurrencyISOCode, 'CAD');
   assert.strictEqual(transactions[1].amount, -23.45);

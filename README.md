@@ -36,7 +36,8 @@ FileCabinet/SuiteScripts/vcf40_fi_parser.js
 - Converts implied-decimal VCF amounts to NetSuite numbers.
 - Signs credit transaction types as negative amounts.
 - Maps numeric ISO currency codes such as `124` and `840` to `CAD` and `USD`.
-- Provides a small optional MCC-to-expense-code bucket map for NetSuite profiles that use expense code mapping.
+- Preserves MCC category hints as `additionalFields.vcfExpenseBucket`; it does not emit `expenseCode` by default for Bank Reconciliation imports.
+- Logs parser summaries and unexpected parser failures to the Financial Institution Parser Plug-in execution log.
 
 ## Why This Exists
 
@@ -66,7 +67,7 @@ Keep those outside this repository. VCF files can contain cardholder names, empl
 5. For reconciliation workflows, use a Bank Reconciliation profile.
 6. On the Account Linking subtab, map each imported VCF account ID to the corresponding NetSuite bank or credit card GL account.
 7. On the Code Type Mapping subtab, map `CHARGE` and `CREDIT` to the appropriate NetSuite bank data types.
-8. If you intentionally use this parser with an employee-expense workflow, map the optional `VCF_*` expense codes to NetSuite expense categories and verify employee matching.
+8. If you intentionally adapt this parser for an employee-expense workflow, add the employee-expense-specific fields back into `createNewTransaction()` and map the `VCF_*` expense codes to NetSuite expense categories.
 
 ## Parsed VCF Records
 
@@ -97,7 +98,21 @@ For Bank Reconciliation, the important parser outputs are:
 - `createAccountData({ accountId: ... })`, which supplies the external account ID to link.
 - `createNewTransaction({ date, amount, transactionTypeCode, uniqueId, ... })`, which supplies statement lines for NetSuite's Match Bank Data and reconciliation workflow.
 
-The parser also includes cardholder, employee, MCC, and optional expense-code metadata where VCF provides it. That metadata can help with display, matching rules, or customizations, but it is not the GL-account mapping mechanism for Bank Reconciliation.
+The parser also includes cardholder, employee, MCC, and optional expense-bucket metadata where VCF provides it. That metadata can help with display, matching rules, or customizations, but it is not the GL-account mapping mechanism for Bank Reconciliation.
+
+By default, `createNewTransaction()` emits a lean Bank Reconciliation payload:
+
+- `id`
+- `uniqueId`
+- `date`
+- `amount`
+- `currency`
+- `payee`
+- `memo`
+- `transactionTypeCode`
+- `additionalFields.billedCurrencyISOCode`
+
+Employee-expense-only fields such as `expenseCode`, `billedTaxAmount`, `localChargeAmount`, `localTaxAmount`, and `currencyExchangeRate` are intentionally not emitted by default because a Bank Reconciliation profile should not depend on Expense Code Mapping.
 
 Oracle's docs describe the same Financial Institution Parser interface for both bank reconciliation and corporate card expense workflows. The downstream behavior is controlled by the NetSuite format profile type:
 
@@ -131,7 +146,7 @@ Do not commit real customer files.
 
 ## Customizing Expense Codes
 
-The parser returns broad `VCF_*` expense code buckets from `getExpenseCodes()` and maps MCCs in `expenseCodeForMcc()`. These are optional metadata for profiles or customizations that use expense-code mapping. A Bank Reconciliation profile should primarily rely on Account Linking and Code Type Mapping.
+The parser keeps broad `VCF_*` expense buckets in `additionalFields.vcfExpenseBucket` and exposes the same buckets through `getExpenseCodes()` for teams that adapt the parser to employee-expense workflows. A Bank Reconciliation profile should primarily rely on Account Linking and Code Type Mapping.
 
 If you want one expense code per MCC, replace the bucket map with raw MCC codes and update `getExpenseCodes()`. If you want company-specific expense categories, keep the parser generic and do the mapping in the NetSuite format profile where possible.
 

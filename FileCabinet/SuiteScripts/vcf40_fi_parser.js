@@ -5,7 +5,10 @@
  * @NScriptType FIParserPlugin
  * @NModuleScope TargetAccount
  */
-define([], function () {
+define(['N/log', 'N/error'], function (log, nsError) {
+    var BANK_IMPORT_STANDARD_ERROR = 'BANK_IMPORT_STANDARD_ERROR';
+    var UNKNOWN_PARSE_ERROR = '1000000000';
+
     var CREDIT_TRANSACTION_TYPES = {
         '11': true,
         '30': true,
@@ -82,10 +85,31 @@ define([], function () {
     };
 
     function parseData(context) {
+        try {
+            parseDataInternal(context);
+        } catch (e) {
+            logParserFailure('VCF parseData failed', e);
+            addParserError(context, UNKNOWN_PARSE_ERROR, '1', '1');
+            throw createStandardError(UNKNOWN_PARSE_ERROR);
+        }
+    }
+
+    function parseDataInternal(context) {
         var contents = getInputContents(context);
         var parsed = parseVcf(contents);
         var accountDataByAccountNumber = {};
+        var accountCount = 0;
         var i;
+
+        logParserAudit('VCF parse summary', {
+            accounts: objectCount(parsed.accounts),
+            cardholders: objectCount(parsed.cardholders),
+            transactions: parsed.transactions.length
+        });
+
+        if (parsed.transactions.length === 0) {
+            throw new Error('No VCF T5 Card Transaction records were found in the input file.');
+        }
 
         for (i = 0; i < parsed.transactions.length; i += 1) {
             var transaction = parsed.transactions[i];
@@ -94,13 +118,21 @@ define([], function () {
             var cardholder = parsed.cardholders[account.cardholderId] || {};
             var accountData = accountDataByAccountNumber[accountNumber];
 
+            validateParsedTransaction(transaction);
+
             if (!accountData) {
                 accountData = createAccountData(context, accountNumber, account, cardholder);
                 accountDataByAccountNumber[accountNumber] = accountData;
+                accountCount += 1;
             }
 
             accountData.createNewTransaction(toNetSuiteTransaction(transaction, account, cardholder));
         }
+
+        logParserAudit('VCF import objects created', {
+            accounts: accountCount,
+            transactions: parsed.transactions.length
+        });
     }
 
     function getExpenseCodes(context) {
@@ -164,6 +196,21 @@ define([], function () {
         }
 
         return context.createAccountData(options);
+    }
+
+    function validateParsedTransaction(transaction) {
+        if (!transaction.accountNumber) {
+            throw new Error('VCF T5 transaction is missing account number at parsed line ' + transaction.lineNumber + '.');
+        }
+        if (!transaction.transactionDate && !transaction.postingDate) {
+            throw new Error('VCF T5 transaction is missing usable transaction/posting date for account ' + lastFour(transaction.accountNumber) + '.');
+        }
+        if (!transaction.transactionReferenceNumber && !transaction.sequenceNumber) {
+            throw new Error('VCF T5 transaction is missing both transaction reference number and sequence number for account ' + lastFour(transaction.accountNumber) + '.');
+        }
+        if (!transaction.billingCurrencyCode && !transaction.sourceCurrencyCode) {
+            throw new Error('VCF T5 transaction is missing billing/source currency for account ' + lastFour(transaction.accountNumber) + '.');
+        }
     }
 
     function parseVcf(contents) {
@@ -298,19 +345,14 @@ define([], function () {
             uniqueId: uniqueId,
             date: transactionDate,
             amount: roundMoney(transaction.billingAmount),
-            billedTaxAmount: roundMoney(transaction.taxAmount),
-            localChargeAmount: roundMoney(transaction.sourceAmount || transaction.billingAmount),
-            localTaxAmount: roundMoney(transaction.taxAmount),
-            currencyExchangeRate: calculateExchangeRate(transaction.sourceAmount, transaction.billingAmount),
             currency: transaction.sourceCurrencyCode || transaction.billingCurrencyCode,
-            expenseCode: expenseCode,
             payee: payee,
             memo: buildMemo(transaction, account, cardholder),
             transactionTypeCode: isCredit(transaction.transactionTypeCode) ? 'CREDIT' : 'CHARGE',
-            additionalFields: {
+            additionalFields: stringMap({
                 billedCurrencyISOCode: transaction.billingCurrencyCode || transaction.sourceCurrencyCode,
-                category: expenseCode,
                 vcfMcc: transaction.merchantCategoryCode,
+                vcfExpenseBucket: expenseCode,
                 vcfTransactionTypeCode: transaction.transactionTypeCode,
                 vcfTransactionTypeLabel: transaction.transactionTypeLabel,
                 vcfCardholderId: account.cardholderId || '',
@@ -321,8 +363,21 @@ define([], function () {
                 vcfAuthorizationNumber: transaction.authorizationNumber,
                 vcfPurchaseIdentification: transaction.purchaseIdentification,
                 vcfCostCenter: account.costCenter || ''
-            }
+            })
         };
+    }
+
+    function stringMap(values) {
+        var result = {};
+        var key;
+
+        for (key in values) {
+            if (values.hasOwnProperty(key) && values[key] !== null && values[key] !== undefined && values[key] !== '') {
+                result[key] = String(values[key]);
+            }
+        }
+
+        return result;
     }
 
     function splitRows(contents) {
@@ -428,6 +483,72 @@ define([], function () {
             }
         }
         return true;
+    }
+
+    function objectCount(values) {
+        var count = 0;
+        var key;
+
+        for (key in values) {
+            if (values.hasOwnProperty(key)) {
+                count += 1;
+            }
+        }
+
+        return count;
+    }
+
+    function addParserError(context, errorCode, lineNumber, characterOffset) {
+        if (context && typeof context.addError === 'function') {
+            context.addError({
+                errorCode: errorCode,
+                lineNumber: String(lineNumber || '1'),
+                characterOffset: String(characterOffset || '1')
+            });
+        }
+    }
+
+    function createStandardError(errorCode) {
+        if (nsError && typeof nsError.create === 'function') {
+            return nsError.create({
+                name: BANK_IMPORT_STANDARD_ERROR,
+                message: errorCode
+            });
+        }
+
+        var fallback = new Error(errorCode);
+        fallback.name = BANK_IMPORT_STANDARD_ERROR;
+        return fallback;
+    }
+
+    function logParserAudit(title, details) {
+        if (log && typeof log.audit === 'function') {
+            log.audit({
+                title: title,
+                details: stringify(details)
+            });
+        }
+    }
+
+    function logParserFailure(title, error) {
+        if (log && typeof log.error === 'function') {
+            log.error({
+                title: title,
+                details: stringify({
+                    name: error && error.name,
+                    message: error && error.message,
+                    stack: error && error.stack
+                })
+            });
+        }
+    }
+
+    function stringify(value) {
+        try {
+            return JSON.stringify(value);
+        } catch (e) {
+            return String(value);
+        }
     }
 
     function clean(value) {
