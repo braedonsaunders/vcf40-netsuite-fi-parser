@@ -76,6 +76,8 @@ function createMockContext(contents, options = {}) {
     inputData,
     createAccountData(options) {
       assert(options.accountId, 'Bank reconciliation account data should include the external accountId.');
+      assert(!Object.prototype.hasOwnProperty.call(options, 'cardHolder'), 'Bank reconciliation account data should not include employee-expense cardHolder.');
+      assert(!Object.prototype.hasOwnProperty.call(options, 'employeeId'), 'Bank reconciliation account data should not include employee-expense employeeId.');
 
       const account = {
         options,
@@ -200,8 +202,8 @@ if (usingDefaultFixture) {
   );
 
   assert.strictEqual(context.accounts.length, 1, 'Expected one card account.');
-  assert.strictEqual(account.options.cardHolder, 'AVERY PARK');
-  assert.strictEqual(account.options.employeeId, 'E1001');
+  assert.deepStrictEqual(Object.keys(account.options), ['accountId']);
+  assert.strictEqual(transactions[0].additionalFields.vcfEmployeeId, 'E1001');
   assert.strictEqual(transactions.length, 2, 'Expected two T5 card transactions.');
   assert.strictEqual(centsTotal(transactions), 10000, 'Expected signed transaction total of $100.00.');
   assert.strictEqual(transactions[0].additionalFields.vcfExpenseBucket, 'VCF_OFFICE');
@@ -216,7 +218,6 @@ console.log(JSON.stringify({
   accounts: context.accounts.length,
   transactions: transactions.length,
   signedTotal: (centsTotal(transactions) / 100).toFixed(2),
-  accountsWithoutEmployeeId: context.accounts.filter((parsedAccount) => !parsedAccount.options.employeeId).length,
   firstAccount: usingDefaultFixture ? account.options : undefined,
   firstTransaction: usingDefaultFixture ? transactions[0] : undefined
 }, null, 2));

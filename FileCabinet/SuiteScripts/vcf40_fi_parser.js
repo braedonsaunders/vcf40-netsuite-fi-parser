@@ -185,17 +185,9 @@ define(['N/log', 'N/error'], function (log, nsError) {
     }
 
     function createAccountData(context, accountNumber, account, cardholder) {
-        var cardHolderName = buildCardHolderName(cardholder) || ('Commercial card ' + lastFour(accountNumber));
-        var options = {
-            accountId: accountNumber,
-            cardHolder: cardHolderName
-        };
-
-        if (cardholder.employeeId) {
-            options.employeeId = cardholder.employeeId;
-        }
-
-        return context.createAccountData(options);
+        return context.createAccountData({
+            accountId: accountNumber
+        });
     }
 
     function validateParsedTransaction(transaction) {
