@@ -86,7 +86,8 @@ The parser does not directly assign NetSuite GL accounts from the VCF card accou
 For Bank Reconciliation imports, the GL mapping happens in NetSuite Account Linking:
 
 - The parser groups T5 transactions by VCF card account number.
-- For each VCF account number, the parser calls `createAccountData()` with `accountId` set to a stable redacted external ID, such as `VCF-1234-1A2B3C`.
+- For each VCF card account, the parser calls `createAccountData()` with `accountId` set to the T3 cardholder/account linking key when available, such as `220001` or another issuer-provided employee/card identifier.
+- If an issuer does not provide a safe T3 linking key, the parser falls back to a stable redacted external ID, such as `VCF-1234-1A2B3C`.
 - NetSuite uses that `accountId` on the Account Linking subtab, where you map the imported account to the corresponding NetSuite bank or credit card GL account.
 - In this bank-reconciliation parser, `createAccountData()` intentionally does not pass `cardHolder` or `employeeId`. Those fields are for NetSuite's employee-expense corporate-card workflow and can cause imports to fail when the goal is statement reconciliation.
 

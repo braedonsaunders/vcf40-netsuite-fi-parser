@@ -122,7 +122,7 @@ define(['N/log', 'N/error'], function (log, nsError) {
 
             if (!accountData) {
                 logParserAudit('VCF account data create', {
-                    accountId: externalAccountId(accountNumber),
+                    accountId: accountLinkingId(accountNumber, account),
                     accountLast4: lastFour(accountNumber)
                 });
                 accountData = createAccountData(context, accountNumber, account, cardholder);
@@ -190,7 +190,7 @@ define(['N/log', 'N/error'], function (log, nsError) {
 
     function createAccountData(context, accountNumber, account, cardholder) {
         return context.createAccountData({
-            accountId: externalAccountId(accountNumber)
+            accountId: accountLinkingId(accountNumber, account)
         });
     }
 
@@ -330,7 +330,7 @@ define(['N/log', 'N/error'], function (log, nsError) {
         var payee = transaction.supplierName || transaction.transactionTypeLabel || 'Commercial Card';
         var expenseCode = expenseCodeForMcc(transaction.merchantCategoryCode);
         var uniqueId = [
-            externalAccountId(transaction.accountNumber),
+            accountLinkingId(transaction.accountNumber, account),
             transaction.postingDateRaw,
             transaction.transactionReferenceNumber,
             transaction.sequenceNumber
@@ -374,6 +374,16 @@ define(['N/log', 'N/error'], function (log, nsError) {
         }
 
         return result;
+    }
+
+    function accountLinkingId(accountNumber, account) {
+        var candidate = clean(account && account.cardholderId);
+
+        if (candidate && !/^[0-9]{13,19}$/.test(candidate)) {
+            return candidate;
+        }
+
+        return externalAccountId(accountNumber);
     }
 
     function externalAccountId(accountNumber) {

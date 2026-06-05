@@ -76,7 +76,7 @@ function createMockContext(contents, options = {}) {
     inputData,
     createAccountData(options) {
       assert(options.accountId, 'Bank reconciliation account data should include the external accountId.');
-      assert(/^VCF-[0-9]{4}-[0-9A-Z]+$/.test(options.accountId), 'Bank reconciliation accountId should be a redacted VCF external account ID.');
+      assert(!/^[0-9]{13,19}$/.test(options.accountId), 'Bank reconciliation accountId should not expose a raw card/account number.');
       assert(!Object.prototype.hasOwnProperty.call(options, 'cardHolder'), 'Bank reconciliation account data should not include employee-expense cardHolder.');
       assert(!Object.prototype.hasOwnProperty.call(options, 'employeeId'), 'Bank reconciliation account data should not include employee-expense employeeId.');
 
@@ -205,7 +205,7 @@ if (usingDefaultFixture) {
 
   assert.strictEqual(context.accounts.length, 1, 'Expected one card account.');
   assert.deepStrictEqual(Object.keys(account.options), ['accountId']);
-  assert(/^VCF-1111-[0-9A-Z]+$/.test(account.options.accountId), 'Expected redacted account ID for account linking.');
+  assert.strictEqual(account.options.accountId, 'EMP-1001', 'Expected the T3 cardholder/account key for account linking.');
   assert.strictEqual(transactions[0].additionalFields.vcfEmployeeId, 'E1001');
   assert.strictEqual(transactions.length, 2, 'Expected two T5 card transactions.');
   assert.strictEqual(centsTotal(transactions), 10000, 'Expected signed transaction total of $100.00.');
