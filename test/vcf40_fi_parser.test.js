@@ -76,6 +76,7 @@ function createMockContext(contents, options = {}) {
     inputData,
     createAccountData(options) {
       assert(options.accountId, 'Bank reconciliation account data should include the external accountId.');
+      assert(/^VCF-[0-9]{4}-[0-9A-Z]+$/.test(options.accountId), 'Bank reconciliation accountId should be a redacted VCF external account ID.');
       assert(!Object.prototype.hasOwnProperty.call(options, 'cardHolder'), 'Bank reconciliation account data should not include employee-expense cardHolder.');
       assert(!Object.prototype.hasOwnProperty.call(options, 'employeeId'), 'Bank reconciliation account data should not include employee-expense employeeId.');
 
@@ -86,6 +87,7 @@ function createMockContext(contents, options = {}) {
           assert(transaction.date, 'Transaction date is required.');
           assert.strictEqual(typeof transaction.amount, 'number', 'Transaction amount must be numeric.');
           assert(transaction.uniqueId, 'Transaction uniqueId is required for duplicate detection.');
+          assert(!/^[0-9]{13,19}\|/.test(transaction.uniqueId), 'Transaction uniqueId should not expose raw card/account numbers.');
           assert(transaction.transactionTypeCode, 'Bank reconciliation transactionTypeCode is required.');
           assert(transaction.additionalFields.billedCurrencyISOCode, 'billedCurrencyISOCode should be available for card currency metadata.');
           assert(!transaction.expenseCode, 'Bank reconciliation transactions should not require expenseCode by default.');
@@ -203,6 +205,7 @@ if (usingDefaultFixture) {
 
   assert.strictEqual(context.accounts.length, 1, 'Expected one card account.');
   assert.deepStrictEqual(Object.keys(account.options), ['accountId']);
+  assert(/^VCF-1111-[0-9A-Z]+$/.test(account.options.accountId), 'Expected redacted account ID for account linking.');
   assert.strictEqual(transactions[0].additionalFields.vcfEmployeeId, 'E1001');
   assert.strictEqual(transactions.length, 2, 'Expected two T5 card transactions.');
   assert.strictEqual(centsTotal(transactions), 10000, 'Expected signed transaction total of $100.00.');

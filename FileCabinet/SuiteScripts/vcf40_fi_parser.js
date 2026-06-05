@@ -121,6 +121,10 @@ define(['N/log', 'N/error'], function (log, nsError) {
             validateParsedTransaction(transaction);
 
             if (!accountData) {
+                logParserAudit('VCF account data create', {
+                    accountId: externalAccountId(accountNumber),
+                    accountLast4: lastFour(accountNumber)
+                });
                 accountData = createAccountData(context, accountNumber, account, cardholder);
                 accountDataByAccountNumber[accountNumber] = accountData;
                 accountCount += 1;
@@ -186,7 +190,7 @@ define(['N/log', 'N/error'], function (log, nsError) {
 
     function createAccountData(context, accountNumber, account, cardholder) {
         return context.createAccountData({
-            accountId: accountNumber
+            accountId: externalAccountId(accountNumber)
         });
     }
 
@@ -326,7 +330,7 @@ define(['N/log', 'N/error'], function (log, nsError) {
         var payee = transaction.supplierName || transaction.transactionTypeLabel || 'Commercial Card';
         var expenseCode = expenseCodeForMcc(transaction.merchantCategoryCode);
         var uniqueId = [
-            transaction.accountNumber,
+            externalAccountId(transaction.accountNumber),
             transaction.postingDateRaw,
             transaction.transactionReferenceNumber,
             transaction.sequenceNumber
@@ -370,6 +374,28 @@ define(['N/log', 'N/error'], function (log, nsError) {
         }
 
         return result;
+    }
+
+    function externalAccountId(accountNumber) {
+        var value = clean(accountNumber);
+
+        if (!value) {
+            return 'VCF-UNKNOWN';
+        }
+
+        return 'VCF-' + lastFour(value) + '-' + stableHash(value);
+    }
+
+    function stableHash(value) {
+        var hash = 2166136261;
+        var i;
+
+        for (i = 0; i < value.length; i += 1) {
+            hash ^= value.charCodeAt(i);
+            hash = (hash + (hash << 1) + (hash << 4) + (hash << 7) + (hash << 8) + (hash << 24)) >>> 0;
+        }
+
+        return hash.toString(36).toUpperCase();
     }
 
     function splitRows(contents) {
