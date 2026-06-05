@@ -193,27 +193,30 @@ if (usingDefaultFixture) {
   assert.strictEqual(iteratorContext.accounts.length, 1, 'Expected iterator input to parse one card account.');
   assert.strictEqual(
     iteratorContext.accounts.flatMap((parsedAccount) => parsedAccount.transactions).length,
-    2,
-    'Expected iterator input to parse two card transactions.'
+    3,
+    'Expected iterator input to parse three card transactions.'
   );
   assert.strictEqual(concatenatedContext.accounts.length, 1, 'Expected concatenated input to parse one card account.');
   assert.strictEqual(
     concatenatedContext.accounts.flatMap((parsedAccount) => parsedAccount.transactions).length,
-    2,
-    'Expected concatenated input to parse two card transactions.'
+    3,
+    'Expected concatenated input to parse three card transactions.'
   );
 
   assert.strictEqual(context.accounts.length, 1, 'Expected one card account.');
   assert.deepStrictEqual(Object.keys(account.options), ['accountId']);
   assert.strictEqual(account.options.accountId, 'EMP-1001', 'Expected the T3 cardholder/account key for account linking.');
   assert.strictEqual(transactions[0].additionalFields.vcfEmployeeId, 'E1001');
-  assert.strictEqual(transactions.length, 2, 'Expected two T5 card transactions.');
-  assert.strictEqual(centsTotal(transactions), 10000, 'Expected signed transaction total of $100.00.');
+  assert.strictEqual(transactions.length, 3, 'Expected three imported T5 card transactions and one skipped payment.');
+  assert.strictEqual(centsTotal(transactions), 11380, 'Expected signed transaction total of $113.80.');
   assert.strictEqual(transactions[0].additionalFields.vcfExpenseBucket, 'VCF_OFFICE');
   assert.strictEqual(transactions[0].currency, 'CAD');
   assert.strictEqual(transactions[0].additionalFields.billedCurrencyISOCode, 'CAD');
   assert.strictEqual(transactions[1].amount, -23.45);
   assert.strictEqual(transactions[1].transactionTypeCode, 'CREDIT');
+  assert.strictEqual(transactions[2].currency, 'CAD');
+  assert.strictEqual(transactions[2].additionalFields.sourceCurrencyISOCode, 'USD');
+  assert.strictEqual(transactions[2].additionalFields.sourceAmount, '10');
 }
 
 console.log(JSON.stringify({
