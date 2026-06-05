@@ -35,6 +35,7 @@ FileCabinet/SuiteScripts/vcf40_fi_parser.js
 - Converts VCF `MMDDCCYY` dates to NetSuite ISO `YYYY-MM-DD`.
 - Converts implied-decimal VCF amounts to NetSuite numbers.
 - Signs credit transaction types as negative amounts.
+- Skips VCF transaction type `31` payment settlement records by default, so issuer/master-account payment lines are not imported as card spend.
 - Maps numeric ISO currency codes such as `124` and `840` to `CAD` and `USD`.
 - Preserves MCC category hints as `additionalFields.vcfExpenseBucket`; it does not emit `expenseCode` by default for Bank Reconciliation imports.
 - Logs parser summaries and unexpected parser failures to the Financial Institution Parser Plug-in execution log.

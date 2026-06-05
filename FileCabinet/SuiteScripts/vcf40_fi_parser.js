@@ -9,6 +9,10 @@ define(['N/log', 'N/error'], function (log, nsError) {
     var BANK_IMPORT_STANDARD_ERROR = 'BANK_IMPORT_STANDARD_ERROR';
     var UNKNOWN_PARSE_ERROR = '1000000000';
 
+    var SKIPPED_TRANSACTION_TYPES = {
+        '31': 'Payment settlement'
+    };
+
     var CREDIT_TRANSACTION_TYPES = {
         '11': true,
         '30': true,
@@ -99,6 +103,8 @@ define(['N/log', 'N/error'], function (log, nsError) {
         var parsed = parseVcf(contents);
         var accountDataByAccountNumber = {};
         var accountCount = 0;
+        var importedTransactionCount = 0;
+        var skippedTransactionCount = 0;
         var i;
 
         logParserAudit('VCF parse summary', {
@@ -120,6 +126,11 @@ define(['N/log', 'N/error'], function (log, nsError) {
 
             validateParsedTransaction(transaction);
 
+            if (shouldSkipTransaction(transaction)) {
+                skippedTransactionCount += 1;
+                continue;
+            }
+
             if (!accountData) {
                 logParserAudit('VCF account data create', {
                     accountId: accountLinkingId(accountNumber, account),
@@ -131,11 +142,13 @@ define(['N/log', 'N/error'], function (log, nsError) {
             }
 
             accountData.createNewTransaction(toNetSuiteTransaction(transaction, account, cardholder));
+            importedTransactionCount += 1;
         }
 
         logParserAudit('VCF import objects created', {
             accounts: accountCount,
-            transactions: parsed.transactions.length
+            transactions: importedTransactionCount,
+            skippedTransactions: skippedTransactionCount
         });
     }
 
@@ -207,6 +220,10 @@ define(['N/log', 'N/error'], function (log, nsError) {
         if (!transaction.billingCurrencyCode && !transaction.sourceCurrencyCode) {
             throw new Error('VCF T5 transaction is missing billing/source currency for account ' + lastFour(transaction.accountNumber) + '.');
         }
+    }
+
+    function shouldSkipTransaction(transaction) {
+        return SKIPPED_TRANSACTION_TYPES[clean(transaction.transactionTypeCode)] === 'Payment settlement';
     }
 
     function parseVcf(contents) {
